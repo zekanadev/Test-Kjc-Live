@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Livestream Player</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000;
+        }
+        video {
+            width: 100%;
+            max-width: 1200px;
+            background-color: black;
+            border: 2px solid #fff;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <video id="video" controls autoplay muted playsinline></video>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script>
+        const videoUrl = 'https://cdn.livekjc.net/klive1/KJC-lanaa/index.m3u8?expire=1760946171&sign=a1c1a50f2d0267a79adf54844d15e475';
+        const video = document.getElementById('video');
+
+        if (Hls.isSupported()) {
+            const hls = new Hls({
+                lowLatencyMode: true,
+                maxBufferLength: 60,
+                maxBufferSize: 60 * 1000 * 1000,
+                maxMaxBufferLength: 15,
+                maxBufferHole: 0.1,
+                liveSyncDuration: 3,
+                liveMaxLatencyDuration: 6,
+                startLevel: 0,
+                backBufferLength: 10,
+                enableWorker: true
+            });
+
+            hls.on(Hls.Events.WORKER_CREATED, () => {
+                console.log("🛠️ Web Worker của Hls.js đã được tạo và đang hoạt động");
+            });
+
+            hls.loadSource(videoUrl);
+            hls.attachMedia(video);
+
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                console.log("✅ Stream loaded successfully");
+                video.muted = true;
+                video.play().catch(err => {
+                    console.warn("⚠️ Autoplay bị chặn:", err);
+                });
+            });
+
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                if (data.fatal) {
+                    switch (data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            console.error("Network error: " + data.details);
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            console.error("Media error: " + data.details);
+                            hls.recoverMediaError();
+                            break;
+                        default:
+                            console.error("Fatal error: " + data.details);
+                            hls.destroy();
+                            break;
+                    }
+                }
+            });
+
+            hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+                console.log(`🔄 Switched to level ${data.level}`);
+            });
+
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = videoUrl;
+            video.muted = true;
+            video.play().catch(err => {
+                console.warn("⚠️ Autoplay bị chặn:", err);
+            });
+        } else {
+            alert("Trình duyệt không hỗ trợ HLS.");
+        }
+
+        video.addEventListener('ended', () => {
+            console.log("🔁 Video ended. Reconnecting...");
+            video.load();
+            video.play();
+        });
+
+        window.addEventListener('online', () => {
+            console.log("🔌 Online - Resume if paused");
+            if (video.paused) video.play();
+        });
+
+        window.addEventListener('offline', () => {
+            console.log("📴 Offline - Pause stream");
+            video.pause();
+        });
+    </script>
+</body>
+</html>
